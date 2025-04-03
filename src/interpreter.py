@@ -21,6 +21,8 @@ class CustomInterpreterVisitor(GrammarVisitor):
         self.functions: dict[str, {}] = {}
         self.builtin_functions = {}
         self.scopes = [{}]
+        self.break_loop = False
+        self.continue_loop = False
 
         self.builtin_functions["print"] = builtin_print
 
@@ -93,10 +95,34 @@ class CustomInterpreterVisitor(GrammarVisitor):
         return self.visitChildren(ctx)
 
     def visitIfStatement(self, ctx: GrammarParser.IfStatementContext):
-        return self.visitChildren(ctx)
+        condition = self.visit(ctx.expression())
+
+        is_true = bool(condition)
+
+        if is_true:
+            self.visit(ctx.statement(0))
+        elif ctx.ELSE():
+            self.visit(ctx.statement(1))
+        return None
 
     def visitWhileStatement(self, ctx: GrammarParser.WhileStatementContext):
-        return self.visitChildren(ctx)
+        while True:
+            condition = self.visit(ctx.expression())
+            is_true = bool(condition)
+
+            if not is_true:
+                break
+
+            self.visit(ctx.statement())
+
+            if self.break_loop:
+                self.break_loop = False
+                break
+            if self.continue_loop:
+                self.continue_loop = False
+                continue
+
+        return None
 
     def visitBlockStatement(self, ctx: GrammarParser.BlockStatementContext):
         self.enter_scope()
@@ -104,20 +130,43 @@ class CustomInterpreterVisitor(GrammarVisitor):
         self.exit_scope()
         return result
 
-    def visitExpressionStatement(self, ctx: GrammarParser.ExpressionStatementContext):
-        return self.visitChildren(ctx)
-
-    def visitExpression(self, ctx: GrammarParser.ExpressionContext):
-        return self.visitChildren(ctx)
-
     def visitLogicalOrExpr(self, ctx: GrammarParser.LogicalOrExprContext):
-        return self.visitChildren(ctx)
+        left = self.visit(ctx.left)
+
+        if not ctx.OR():
+            return left
+
+        if bool(left):
+            return left
+
+        return self.visit(ctx.right)
 
     def visitLogicalAndExpr(self, ctx: GrammarParser.LogicalAndExprContext):
-        return self.visitChildren(ctx)
+        left = self.visit(ctx.left)
+
+        if not ctx.AND():
+            return left
+
+        if not bool(left):
+            return left
+
+        return self.visit(ctx.right)
 
     def visitComparisonExpr(self, ctx: GrammarParser.ComparisonExprContext):
-        return self.visitChildren(ctx)
+        if not ctx.compOp():
+            return self.visit(ctx.left)
+
+        left = self.visit(ctx.left)
+        right = self.visit(ctx.right)
+        op = ctx.compOp().getText()
+
+        if op == '==': return left == right
+        if op == '!=': return left != right
+        if op == '<':  return left < right
+        if op == '>':  return left > right
+        if op == '<=': return left <= right
+        if op == '>=': return left >= right
+        raise TypeError(f"Unsupported comparison operator: {op}")
 
     def visitAdditiveExpr(self, ctx: GrammarParser.AdditiveExprContext):
         result = self.visit(ctx.multiplicativeExpr(0))
@@ -201,11 +250,11 @@ class CustomInterpreterVisitor(GrammarVisitor):
                 value = call_args[i]
                 self.set_variable(name, value)
 
-        self.visit(body)
+        return_value = self.visit(body)
 
         self.exit_scope()
 
-        return None
+        return return_value
 
     def visitArgumentList(self, ctx: GrammarParser.ArgumentListContext):
         args = []

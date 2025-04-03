@@ -41,13 +41,13 @@ expressionStatement: expression SEMI;
 expression: logicalOrExpr;
 
 logicalOrExpr
-    : logicalAndExpr (OR logicalAndExpr)*;
+    : left=logicalAndExpr (OR right=logicalAndExpr)*;
 
 logicalAndExpr
-    : comparisonExpr (AND comparisonExpr)*;
+    : left=comparisonExpr (AND right=comparisonExpr)*;
 
 comparisonExpr
-    : additiveExpr (compOp additiveExpr)?;
+    : left=additiveExpr (compOp right=additiveExpr)?;
 
 additiveExpr
     : multiplicativeExpr (addOp multiplicativeExpr)*;

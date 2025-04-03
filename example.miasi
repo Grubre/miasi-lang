@@ -9,9 +9,19 @@ print(x, x);
 
 let z = 25;
 x = 7;
+
+if(x > 5) {
+    print(1);
+}
 do_smth(x);
 {
     let x = 8;
     print(x);
 }
-print(x);
+
+let i = 0;
+while(i < 10) {
+    print(i);
+    i = i + 1;
+}
+print(i);
