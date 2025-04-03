@@ -1,0 +1,9 @@
+let x = 2 + 2 * 2;
+print(x, x);
+x = 7;
+print(x);
+{
+    let x = 8;
+    print(x);
+}
+print(x);
