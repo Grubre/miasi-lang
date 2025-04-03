@@ -3,6 +3,12 @@ proc do_smth(y) {
     print(z);
 }
 
+proc get_value() {
+    return -5;
+}
+
+print(get_value());
+
 let x = 2 + 2 * 2;
 
 print(x, x);

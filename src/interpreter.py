@@ -23,6 +23,9 @@ class CustomInterpreterVisitor(GrammarVisitor):
         self.scopes = [{}]
         self.break_loop = False
         self.continue_loop = False
+        self.return_stmt_called = False
+        self.is_inside_loop = False
+        self.is_inside_func = False
 
         self.builtin_functions["print"] = builtin_print
 
@@ -77,13 +80,26 @@ class CustomInterpreterVisitor(GrammarVisitor):
         return None
 
     def visitReturnStatement(self, ctx: GrammarParser.ReturnStatementContext):
-        return self.visitChildren(ctx)
+        if not self.is_inside_func:
+            raise SyntaxError("Return statement outside function")
+        value = None
+        if ctx.expression():
+            value = self.visit(ctx.expression())
+
+        self.return_stmt_called = True
+        return value
 
     def visitBreakStatement(self, ctx: GrammarParser.BreakStatementContext):
-        return self.visitChildren(ctx)
+        if not self.is_inside_loop:
+            raise SyntaxError("Break statement outside loop")
+        self.break_loop = True
+        return None
 
     def visitContinueStatement(self, ctx: GrammarParser.ContinueStatementContext):
-        return self.visitChildren(ctx)
+        if not self.is_inside_loop:
+            raise SyntaxError("Continue statement outside loop")
+        self.continue_loop = True
+        return None
 
     def visitIfStatement(self, ctx: GrammarParser.IfStatementContext):
         condition = self.visit(ctx.expression())
@@ -97,6 +113,7 @@ class CustomInterpreterVisitor(GrammarVisitor):
         return None
 
     def visitWhileStatement(self, ctx: GrammarParser.WhileStatementContext):
+        self.is_inside_loop = True
         while True:
             condition = self.visit(ctx.expression())
             is_true = bool(condition)
@@ -113,12 +130,20 @@ class CustomInterpreterVisitor(GrammarVisitor):
                 self.continue_loop = False
                 continue
 
+        self.is_inside_loop = False
+
         return None
 
     def visitBlockStatement(self, ctx: GrammarParser.BlockStatementContext):
         self.enter_scope()
-        result = self.visitChildren(ctx)
-        self.exit_scope()
+        result = None
+        try:
+            for statement in ctx.statement():
+                result = self.visit(statement)
+                if self.break_loop or self.continue_loop or self.return_stmt_called:
+                    return result
+        finally:
+            self.exit_scope()
         return result
 
     def visitLogicalOrExpr(self, ctx: GrammarParser.LogicalOrExprContext):
@@ -144,10 +169,11 @@ class CustomInterpreterVisitor(GrammarVisitor):
         return self.visit(ctx.right)
 
     def visitComparisonExpr(self, ctx: GrammarParser.ComparisonExprContext):
-        if not ctx.compOp():
-            return self.visit(ctx.left)
-
         left = self.visit(ctx.left)
+
+        if ctx.compOp() is None:
+            return left
+
         right = self.visit(ctx.right)
         op = ctx.compOp().getText()
 
@@ -165,6 +191,7 @@ class CustomInterpreterVisitor(GrammarVisitor):
         for i in range(1, len(ctx.multiplicativeExpr())):
             op = ctx.addOp(i-1).getText()
             right = self.visit(ctx.multiplicativeExpr(i))
+
             if op == '+':
                 result += right
             elif op == '-':
@@ -243,6 +270,7 @@ class CustomInterpreterVisitor(GrammarVisitor):
             raise TypeError(f"Incorrect number of arguments for function '{function_name}'. Expected {arity}, got {len(call_args)}")
 
         # execute the function
+        self.is_inside_func = True
         self.enter_scope()
 
         if params:
@@ -254,6 +282,8 @@ class CustomInterpreterVisitor(GrammarVisitor):
         return_value = self.visit(body)
 
         self.exit_scope()
+        self.is_inside_func = False
+        self.return_stmt_called = False
 
         return return_value
 
@@ -277,27 +307,24 @@ class CustomInterpreterVisitor(GrammarVisitor):
             raise TypeError("Unsupported literal type")
 
 def run_file(filename: str):
-    """
-    Parses and interprets the given file using the ExprCore grammar and MyInterpreterVisitor.
-    """
     print(f"Attempting to interpret file: {filename}")
     try:
         input_stream = FileStream(filename)
         lexer = GrammarLexer(input_stream)
-        lexer.removeErrorListeners() # Remove default console listener
+        lexer.removeErrorListeners()
         lexer.addErrorListener(BasicErrorListener())
 
         stream = CommonTokenStream(lexer)
         parser = GrammarParser(stream)
-        parser.removeErrorListeners() # Remove default console listener
+        parser.removeErrorListeners()
         parser.addErrorListener(BasicErrorListener())
 
-        tree = parser.program() # Start parsing from the 'program' rule
+        tree = parser.program()
 
         if parser.getNumberOfSyntaxErrors() == 0:
             print("Parsing successful. Starting interpretation...")
             visitor = CustomInterpreterVisitor()
-            visitor.visit(tree) # Start interpretation by visiting the tree root
+            visitor.visit(tree)
         else:
             print("Parsing failed. Halting execution.")
 
@@ -310,7 +337,6 @@ def run_file(filename: str):
     except ZeroDivisionError as e:
         print(f"Runtime Error: {e}", file=sys.stderr)
     except Exception as e:
-        # Catch other potential errors during interpretation
         print(f"An unexpected error occurred: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
