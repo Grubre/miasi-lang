@@ -13,17 +13,12 @@ class BasicErrorListener(ErrorListener):
         print(f"Syntax Error at Line {line}:{column} - {msg}", file=sys.stderr)
         raise SyntaxError(f"Line {line}:{column} {msg}")
 
-class Function:
-    def __init__(self, params, body):
-        self.params = params
-        self.body = body
-
 def builtin_print(*x):
     print(*x)
 
 class CustomInterpreterVisitor(GrammarVisitor):
     def __init__(self):
-        self.functions: dict[str, Function] = {}
+        self.functions: dict[str, {}] = {}
         self.builtin_functions = {}
         self.scopes = [{}]
 
@@ -60,7 +55,16 @@ class CustomInterpreterVisitor(GrammarVisitor):
         return self.visitChildren(ctx)
 
     def visitFunctionDefinition(self, ctx: GrammarParser.FunctionDefinitionContext):
-        return self.visitChildren(ctx)
+        name = ctx.IDENTIFIER().getText()
+        if name in self.builtin_functions:
+            raise NameError(f"Function '{name}' is a reserved keyword and cannot be used as a function name.")
+        if name in self.functions:
+            raise NameError(f"Function '{name}' has already been defined.")
+        self.functions[name] = {
+            'params': ctx.parameterList(),
+            'body': ctx.blockStatement()
+        }
+        return None
 
     def visitParameterList(self, ctx: GrammarParser.ParameterListContext):
         return self.visitChildren(ctx)
@@ -155,10 +159,20 @@ class CustomInterpreterVisitor(GrammarVisitor):
     def visitPrimaryExpr(self, ctx: GrammarParser.PrimaryExprContext):
         if ctx.IDENTIFIER():
             return self.get_variable(ctx.IDENTIFIER().getText())
-        return self.visitChildren(ctx)
+        if ctx.literal():
+            return self.visit(ctx.literal())
+        if ctx.functionCall():
+            return self.visit(ctx.functionCall())
+        if ctx.expression():
+            return self.visit(ctx.expression())
+
+        raise RuntimeError("Unhandled primary expression type")
 
     def visitFunctionCall(self, ctx: GrammarParser.FunctionCallContext):
         function_name = ctx.IDENTIFIER().getText()
+
+        if (function_name not in self.functions) and (function_name not in self.builtin_functions):
+            raise NameError(f"Function '{function_name}' is not defined.")
 
         call_args = []
         if ctx.argumentList() is not None:
@@ -167,22 +181,37 @@ class CustomInterpreterVisitor(GrammarVisitor):
         if function_name in self.builtin_functions:
             return self.builtin_functions[function_name](*call_args)
 
-        return self.visitChildren(ctx)
+        func_data = self.functions[function_name]
+        params = func_data['params']
+        body = func_data['body']
+
+        arity = 0
+        if params:
+             arity = len(params.IDENTIFIER())
+
+        if arity != len(call_args):
+            raise TypeError(f"Incorrect number of arguments for function '{function_name}'. Expected {arity}, got {len(call_args)}")
+
+        # execute the function
+        self.enter_scope()
+
+        if params:
+            for i in range(len(params.IDENTIFIER())):
+                name = params.IDENTIFIER(i).getText()
+                value = call_args[i]
+                self.set_variable(name, value)
+
+        self.visit(body)
+
+        self.exit_scope()
+
+        return None
 
     def visitArgumentList(self, ctx: GrammarParser.ArgumentListContext):
         args = []
         for arg in ctx.expression():
             args.append(self.visit(arg))
         return args
-
-    def visitCompOp(self, ctx: GrammarParser.CompOpContext):
-        return self.visitChildren(ctx)
-
-    def visitAddOp(self, ctx: GrammarParser.AddOpContext):
-        return self.visitChildren(ctx)
-
-    def visitMulOp(self, ctx: GrammarParser.MulOpContext):
-        return self.visitChildren(ctx)
 
     def visitLiteral(self, ctx: GrammarParser.LiteralContext):
         if ctx.NUMBER():

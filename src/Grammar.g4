@@ -17,7 +17,7 @@ statement: functionDefinition
          | continueStatement    // Added continue for loops
          ;
 
-functionDefinition: FN IDENTIFIER LPAREN parameterList? RPAREN blockStatement;
+functionDefinition: PROC IDENTIFIER LPAREN parameterList? RPAREN blockStatement;
 parameterList: IDENTIFIER (COMMA IDENTIFIER)*; // Simple list of names, no types yet
 
 variableDeclaration: LET IDENTIFIER ASSIGN expression SEMI;
@@ -47,7 +47,7 @@ logicalAndExpr
     : comparisonExpr (AND comparisonExpr)*;
 
 comparisonExpr
-    : additiveExpr (compOp additiveExpr)?; // Allow only one comparison for simplicity here, or chain left-to-right
+    : additiveExpr (compOp additiveExpr)?;
 
 additiveExpr
     : multiplicativeExpr (addOp multiplicativeExpr)*;
@@ -56,21 +56,19 @@ multiplicativeExpr
     : unaryExpr (mulOp unaryExpr)*;
 
 unaryExpr
-    : (NOT | MINUS) unaryExpr // Right-associative unary ops
+    : (NOT | MINUS) unaryExpr
     | primaryExpr;
 
 primaryExpr
-    : literal                  // 123, true, "hello" (add string later if needed)
-    | IDENTIFIER               // variable access
+    : literal
+    | IDENTIFIER
     | functionCall
-    | LPAREN expression RPAREN // Parentheses for grouping
+    | LPAREN expression RPAREN
     ;
 
-// Function call: name(arg1, arg2, ...)
 functionCall: IDENTIFIER LPAREN argumentList? RPAREN;
 argumentList: expression (COMMA expression)*;
 
-// Operator fragments used in expression rules
 compOp: EQ | NEQ | LT | GT | LTE | GTE;
 addOp: PLUS | MINUS;
 mulOp: MUL | DIV | MOD;
@@ -82,7 +80,7 @@ literal: NUMBER | BOOLEAN;
 // --- Lexer Rules ---
 
 // Keywords
-FN: 'fn';
+PROC: 'proc';
 LET: 'let';
 IF: 'if';
 ELSE: 'else';
