@@ -50,12 +50,6 @@ class CustomInterpreterVisitor(GrammarVisitor):
                 return scope[name]
         raise NameError(f"Variable '{name}' is not defined")
 
-    def visitProgram(self, ctx: GrammarParser.ProgramContext):
-        return self.visitChildren(ctx)
-
-    def visitStatement(self, ctx: GrammarParser.StatementContext):
-        return self.visitChildren(ctx)
-
     def visitFunctionDefinition(self, ctx: GrammarParser.FunctionDefinitionContext):
         name = ctx.IDENTIFIER().getText()
         if name in self.builtin_functions:
@@ -67,9 +61,6 @@ class CustomInterpreterVisitor(GrammarVisitor):
             'body': ctx.blockStatement()
         }
         return None
-
-    def visitParameterList(self, ctx: GrammarParser.ParameterListContext):
-        return self.visitChildren(ctx)
 
     def visitVariableDeclaration(self, ctx: GrammarParser.VariableDeclarationContext):
         name = ctx.IDENTIFIER().getText()
@@ -203,7 +194,17 @@ class CustomInterpreterVisitor(GrammarVisitor):
         return result
 
     def visitUnaryExpr(self, ctx: GrammarParser.UnaryExprContext):
-        return self.visitChildren(ctx)
+        if ctx.primaryExpr():
+            return self.visit(ctx.primaryExpr())
+
+        operand = self.visit(ctx.unaryExpr())
+
+        if ctx.NOT():
+            return not bool(operand)
+        elif ctx.MINUS():
+            return -operand
+        else:
+            raise TypeError("Unsupported unary operator")
 
     def visitPrimaryExpr(self, ctx: GrammarParser.PrimaryExprContext):
         if ctx.IDENTIFIER():
