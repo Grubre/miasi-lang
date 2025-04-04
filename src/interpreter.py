@@ -1,10 +1,18 @@
 import sys
+
 from antlr4 import CommonTokenStream, FileStream
 from antlr4.error.ErrorListener import ErrorListener
 
 from GrammarLexer import GrammarLexer
 from GrammarParser import GrammarParser
 from GrammarVisitor import GrammarVisitor
+
+from graphics import GraphicsController
+
+class ReturnValue(Exception):
+    def __init__(self, value=None): self.value = value
+class BreakLoop(Exception): pass
+class ContinueLoop(Exception): pass
 
 # --- Basic Error Listener ---
 # (Optional but recommended to get better error messages than default console)
@@ -13,21 +21,30 @@ class BasicErrorListener(ErrorListener):
         print(f"Syntax Error at Line {line}:{column} - {msg}", file=sys.stderr)
         raise SyntaxError(f"Line {line}:{column} {msg}")
 
-def builtin_print(*x):
-    print(*x)
+def builtin_print(*args):
+    print(*args)
+    return None
 
 class CustomInterpreterVisitor(GrammarVisitor):
-    def __init__(self):
+    def __init__(self, graphics_controller: GraphicsController):
         self.functions: dict[str, {}] = {}
         self.builtin_functions = {}
         self.scopes = [{}]
-        self.break_loop = False
-        self.continue_loop = False
-        self.return_stmt_called = False
-        self.is_inside_loop = False
-        self.is_inside_func = False
+        self.properties = {}
 
-        self.builtin_functions["print"] = builtin_print
+        self.graphics_controller = graphics_controller
+
+    def add_builtin_function(self, name, func):
+        if name in self.functions or name in self.builtin_functions:
+            raise NameError(f"Cannot add built-in function: Name '{name}' is already defined.")
+
+        self.builtin_functions[name] = func
+
+    def add_property(self, name, func):
+        if name in self.properties:
+            print(f"Warning: Property '{name}' is being redefined.")
+
+        self.properties[name] = func
 
     def enter_scope(self):
         self.scopes.append({})
@@ -37,7 +54,10 @@ class CustomInterpreterVisitor(GrammarVisitor):
         if len(self.scopes) > 1:
             self.scopes.pop()
 
-    def set_variable(self, name, value):
+    def declare_variable(self, name, value):
+        if name in self.scopes[-1]:
+            print(f"Warning: Variable '{name}' already declared in this scope (shadowing).")
+
         self.scopes[-1][name] = value
 
     def assign_variable(self, name, value):
@@ -53,10 +73,41 @@ class CustomInterpreterVisitor(GrammarVisitor):
                 return scope[name]
         raise NameError(f"Variable '{name}' is not defined")
 
+    def visitProgram(self, ctx:GrammarParser.ProgramContext):
+        self.graphics_controller.start_display()
+        self.graphics_controller.set_window_size(800, 800)
+        self.graphics_controller.set_background_color((125, 125, 255))
+        try:
+            for statement in ctx.statement():
+                self.visit(statement)
+        except ReturnValue:
+            print(f"Warning: 'return' encountered outside of a function call at top level.")
+        except BreakLoop:
+            print(f"Error: 'break' encountered outside of a loop at top level.")
+        except ContinueLoop:
+            print(f"Error: 'continue' encountered outside of a loop at top level.")
+
+        return None
+
+    def visitSetStatement(self, ctx:GrammarParser.SetStatementContext):
+        name = ctx.IDENTIFIER().getText()
+
+        if name in self.properties:
+            setter_func = self.properties[name]
+            try:
+                value = self.visit(ctx.expression())
+                setter_func(value)
+            except Exception as e:
+                raise RuntimeError(f"Error setting property '{name}': {e}") from e
+        else:
+            raise NameError(f"Unknown property '{name}'. Cannot be set.")
+
+        return None
+
     def visitFunctionDefinition(self, ctx: GrammarParser.FunctionDefinitionContext):
         name = ctx.IDENTIFIER().getText()
         if name in self.builtin_functions:
-            raise NameError(f"Function '{name}' is a reserved keyword and cannot be used as a function name.")
+            raise NameError(f"Function '{name}' is a reserved built-in function name.")
         if name in self.functions:
             raise NameError(f"Function '{name}' has already been defined.")
         self.functions[name] = {
@@ -69,7 +120,7 @@ class CustomInterpreterVisitor(GrammarVisitor):
         name = ctx.IDENTIFIER().getText()
         value = self.visit(ctx.expression())
 
-        self.set_variable(name, value)
+        self.declare_variable(name, value)
 
         return None
 
@@ -80,26 +131,16 @@ class CustomInterpreterVisitor(GrammarVisitor):
         return None
 
     def visitReturnStatement(self, ctx: GrammarParser.ReturnStatementContext):
-        if not self.is_inside_func:
-            raise SyntaxError("Return statement outside function")
         value = None
         if ctx.expression():
             value = self.visit(ctx.expression())
-
-        self.return_stmt_called = True
-        return value
+        raise ReturnValue(value)
 
     def visitBreakStatement(self, ctx: GrammarParser.BreakStatementContext):
-        if not self.is_inside_loop:
-            raise SyntaxError("Break statement outside loop")
-        self.break_loop = True
-        return None
+        raise BreakLoop()
 
     def visitContinueStatement(self, ctx: GrammarParser.ContinueStatementContext):
-        if not self.is_inside_loop:
-            raise SyntaxError("Continue statement outside loop")
-        self.continue_loop = True
-        return None
+        raise ContinueLoop()
 
     def visitIfStatement(self, ctx: GrammarParser.IfStatementContext):
         condition = self.visit(ctx.expression())
@@ -113,38 +154,31 @@ class CustomInterpreterVisitor(GrammarVisitor):
         return None
 
     def visitWhileStatement(self, ctx: GrammarParser.WhileStatementContext):
-        self.is_inside_loop = True
         while True:
-            condition = self.visit(ctx.expression())
-            is_true = bool(condition)
+            try:
+                condition = self.visit(ctx.expression())
+                is_true = bool(condition)
 
-            if not is_true:
+                if not is_true:
+                    break
+
+                self.visit(ctx.statement())
+
+            except BreakLoop:
                 break
-
-            self.visit(ctx.statement())
-
-            if self.break_loop:
-                self.break_loop = False
-                break
-            if self.continue_loop:
-                self.continue_loop = False
+            except ContinueLoop:
                 continue
-
-        self.is_inside_loop = False
 
         return None
 
     def visitBlockStatement(self, ctx: GrammarParser.BlockStatementContext):
         self.enter_scope()
-        result = None
         try:
             for statement in ctx.statement():
-                result = self.visit(statement)
-                if self.break_loop or self.continue_loop or self.return_stmt_called:
-                    return result
+                self.visit(statement)
         finally:
             self.exit_scope()
-        return result
+        return None
 
     def visitLogicalOrExpr(self, ctx: GrammarParser.LogicalOrExprContext):
         left = self.visit(ctx.left)
@@ -262,36 +296,36 @@ class CustomInterpreterVisitor(GrammarVisitor):
         params = func_data['params']
         body = func_data['body']
 
+        param_names = []
         arity = 0
         if params:
-             arity = len(params.IDENTIFIER())
+            param_names = [p.getText() for p in params.IDENTIFIER()]
+            arity = len(param_names)
 
         if arity != len(call_args):
             raise TypeError(f"Incorrect number of arguments for function '{function_name}'. Expected {arity}, got {len(call_args)}")
 
         # execute the function
-        self.is_inside_func = True
         self.enter_scope()
+        return_value = None
 
-        if params:
-            for i in range(len(params.IDENTIFIER())):
-                name = params.IDENTIFIER(i).getText()
-                value = call_args[i]
-                self.set_variable(name, value)
+        try:
+            if params:
+                for name, value in zip(param_names, call_args):
+                    print(f"Assigning parameter '{name}' to value {value}" )
+                    self.declare_variable(name, value)
 
-        return_value = self.visit(body)
+            self.visit(body)
 
-        self.exit_scope()
-        self.is_inside_func = False
-        self.return_stmt_called = False
+        except ReturnValue as rv:
+            return_value = rv.value
+        finally:
+            self.exit_scope()
 
         return return_value
 
     def visitArgumentList(self, ctx: GrammarParser.ArgumentListContext):
-        args = []
-        for arg in ctx.expression():
-            args.append(self.visit(arg))
-        return args
+        return [self.visit(expr) for expr in ctx.expression()]
 
     def visitLiteral(self, ctx: GrammarParser.LiteralContext):
         if ctx.NUMBER():
@@ -305,6 +339,13 @@ class CustomInterpreterVisitor(GrammarVisitor):
             return True if bool_str == 'true' else False
         else:
             raise TypeError("Unsupported literal type")
+
+def setup_builtin_functions(interpreter: CustomInterpreterVisitor, graphics_controller: GraphicsController):
+    interpreter.add_builtin_function('print', builtin_print)
+    interpreter.add_builtin_function('rect', lambda x,y,w,h: graphics_controller.draw_rectangle(x,y,w,h,(0,0,0)))
+
+    interpreter.add_property('width', lambda width: graphics_controller.set_window_width(width))
+    interpreter.add_property('height', lambda height: graphics_controller.set_window_height(height))
 
 def run_file(filename: str):
     print(f"Attempting to interpret file: {filename}")
@@ -323,8 +364,15 @@ def run_file(filename: str):
 
         if parser.getNumberOfSyntaxErrors() == 0:
             print("Parsing successful. Starting interpretation...")
-            visitor = CustomInterpreterVisitor()
+            graphics_controller = GraphicsController([800, 800])
+            visitor = CustomInterpreterVisitor(graphics_controller)
+            setup_builtin_functions(visitor, graphics_controller)
+
             visitor.visit(tree)
+
+            print("Interpretation complete. Waiting for graphics window to close...")
+            graphics_controller.wait_for_display_close()
+            print("Graphics window closed.")
         else:
             print("Parsing failed. Halting execution.")
 

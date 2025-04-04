@@ -1,4 +1,3 @@
-// ExprCore.g4
 grammar Grammar;
 
 // --- Parser Rules ---
@@ -8,13 +7,14 @@ program: statement* EOF;
 statement: functionDefinition
          | ifStatement
          | whileStatement
-         | blockStatement       // Explicit block as a statement type
-         | expressionStatement  // For things like function calls `myFunc();`
-         | variableDeclaration  // Added let for completeness within blocks
-         | assignmentStatement  // Added assignment
-         | returnStatement      // Added return
-         | breakStatement       // Added break for loops
-         | continueStatement    // Added continue for loops
+         | blockStatement
+         | expressionStatement
+         | variableDeclaration
+         | assignmentStatement
+         | returnStatement
+         | breakStatement
+         | continueStatement
+         | setStatement
          ;
 
 functionDefinition: PROC IDENTIFIER LPAREN parameterList? RPAREN blockStatement;
@@ -29,6 +29,8 @@ returnStatement: RETURN expression? SEMI; // Optional expression
 breakStatement: BREAK SEMI;
 
 continueStatement: CONTINUE SEMI;
+
+setStatement: SET IDENTIFIER expression SEMI;
 
 ifStatement: IF LPAREN expression RPAREN statement (ELSE statement)?;
 
@@ -93,6 +95,7 @@ FALSE: 'false';
 AND: 'and';
 OR: 'or';
 NOT: 'not';
+SET: 'set';
 
 // Operators and Punctuation
 ASSIGN: '=';
