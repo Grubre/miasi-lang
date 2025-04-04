@@ -42,4 +42,6 @@ while ( i == i ) {
 
 let color = #ff0000;
 rect(100, 100, 100, 100, color);
+rect(500, 500, 50, 50, #00FF00);
 set width 100;
+set bg_color #0000FF;

@@ -45,6 +45,9 @@ class GameView(arcade.View):
             elif cmd_type == "set_window_size":
                 w, h = args
                 self.controller.set_window_size(w, h)
+            elif cmd_type == "bg_color":
+                color, = args
+                self.background_color = color
 
             self.command_queue.task_done()
         except queue.Empty:
@@ -95,7 +98,6 @@ class GraphicsController:
             self._stop_event.set()
 
     def draw_rectangle(self, x, y, width, height, color):
-        print(f"Queue'ing draw_rectangle({x}, {y}, {width}, {height}, {color})")
         self.command_queue.put(("rect", x, y, width, height, color))
 
     def wait_for_display_close(self):
@@ -122,5 +124,4 @@ class GraphicsController:
             self.window.set_size(self.window.width, height)
 
     def set_background_color(self, color):
-        if self.game_view:
-            self.game_view.background_color = color
+        self.command_queue.put(("bg_color", color))

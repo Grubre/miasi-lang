@@ -377,6 +377,7 @@ def setup_builtin_functions(interpreter: CustomInterpreterVisitor, graphics_cont
 
     interpreter.add_property('width', lambda width: graphics_controller.set_window_width(width))
     interpreter.add_property('height', lambda height: graphics_controller.set_window_height(height))
+    interpreter.add_property('bg_color', lambda color: graphics_controller.set_background_color(color))
 
 def run_file(filename: str):
     print(f"Attempting to interpret file: {filename}")
