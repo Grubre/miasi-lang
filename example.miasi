@@ -40,5 +40,6 @@ while ( i == i ) {
     break; }
 }
 
-rect(100, 100, 100, 100);
+let color = #ff0000;
+rect(100, 100, 100, 100, color);
 set width 100;

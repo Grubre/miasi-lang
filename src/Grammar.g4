@@ -76,8 +76,11 @@ addOp: PLUS | MINUS;
 mulOp: MUL | DIV | MOD;
 
 // Literal values
-literal: NUMBER | BOOLEAN;
+literal: NUMBER | BOOLEAN | colorLiteral;
 
+colorLiteral: rgbColor | HEX_COLOR;
+
+rgbColor: RGB LPAREN r=expression COMMA g=expression COMMA b=expression RPAREN;
 
 // --- Lexer Rules ---
 
@@ -96,6 +99,7 @@ AND: 'and';
 OR: 'or';
 NOT: 'not';
 SET: 'set';
+RGB: 'rgb';
 
 // Operators and Punctuation
 ASSIGN: '=';
@@ -116,6 +120,9 @@ LBRACE: '{';
 RBRACE: '}';
 COMMA: ',';
 SEMI: ';';
+
+fragment HEX_DIGIT : [0-9a-fA-F];
+HEX_COLOR : '#' HEX_DIGIT+ ;
 
 // Identifiers (start with letter or underscore, followed by letters, numbers, or underscores)
 IDENTIFIER: [a-zA-Z_] [a-zA-Z0-9_]*;

@@ -25,6 +25,20 @@ def builtin_print(*args):
     print(*args)
     return None
 
+def parse_hex_color(hex_str: str):
+    hex_str = hex_str.lstrip('#')
+    if len(hex_str) != 6:
+        raise ValueError(f"Invalid hex color string: '{hex_str}'")
+
+    try:
+        r = int(hex_str[0:2], 16)
+        g = int(hex_str[2:4], 16)
+        b = int(hex_str[4:6], 16)
+        return r, g, b
+    except Exception as e:
+        raise ValueError(f"Invalid hex color string: '{hex_str}'") from e
+
+
 class CustomInterpreterVisitor(GrammarVisitor):
     def __init__(self, graphics_controller: GraphicsController):
         self.functions: dict[str, {}] = {}
@@ -337,12 +351,29 @@ class CustomInterpreterVisitor(GrammarVisitor):
         elif ctx.BOOLEAN():
             bool_str = ctx.BOOLEAN().getText()
             return True if bool_str == 'true' else False
+        elif ctx.colorLiteral():
+            return self.visitColorLiteral(ctx.colorLiteral())
         else:
             raise TypeError("Unsupported literal type")
 
+    def visitColorLiteral(self, ctx: GrammarParser.ColorLiteralContext):
+        if ctx.HEX_COLOR():
+            hex_str = ctx.HEX_COLOR().getText()[1:]
+            if len(hex_str) != 6:
+                raise ValueError(f"Invalid hex color string: '{hex_str}'")
+            color = parse_hex_color(hex_str)
+            return color
+        elif ctx.rgbColor():
+            r = self.visit(ctx.rgbColor().r)
+            g = self.visit(ctx.rgbColor().g)
+            b = self.visit(ctx.rgbColor().b)
+            return r, g, b
+        else:
+            raise TypeError("Unsupported color literal type")
+
 def setup_builtin_functions(interpreter: CustomInterpreterVisitor, graphics_controller: GraphicsController):
     interpreter.add_builtin_function('print', builtin_print)
-    interpreter.add_builtin_function('rect', lambda x,y,w,h: graphics_controller.draw_rectangle(x,y,w,h,(0,0,0)))
+    interpreter.add_builtin_function('rect', lambda x,y,w,h,color: graphics_controller.draw_rectangle(x,y,w,h,color))
 
     interpreter.add_property('width', lambda width: graphics_controller.set_window_width(width))
     interpreter.add_property('height', lambda height: graphics_controller.set_window_height(height))
