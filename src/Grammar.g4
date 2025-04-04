@@ -66,7 +66,29 @@ primaryExpr
     | IDENTIFIER
     | functionCall
     | LPAREN expression RPAREN
+    | shapeLiteral
     ;
+
+shapeLiteral
+    : rectangleLiteral
+    | circleLiteral
+    | triangleLiteral
+    | lineLiteral
+    ;
+
+namedArgumentList
+    : namedArgument (COMMA namedArgument)*
+    ;
+
+namedArgument
+    : IDENTIFIER COLON expression
+    ;
+
+rectangleLiteral : RECTANGLE LBRACE namedArgumentList? RBRACE;
+circleLiteral : CIRCLE LBRACE namedArgumentList? RBRACE;
+triangleLiteral : TRIANGLE LBRACE namedArgumentList? RBRACE;
+
+lineLiteral : LINE LBRACE namedArgumentList? RBRACE;
 
 functionCall: IDENTIFIER LPAREN argumentList? RPAREN;
 argumentList: expression (COMMA expression)*;
@@ -101,6 +123,11 @@ NOT: 'not';
 SET: 'set';
 RGB: 'rgb';
 
+RECTANGLE: 'Rectangle';
+CIRCLE: 'Circle';
+TRIANGLE: 'Triangle';
+LINE: 'Line';
+
 // Operators and Punctuation
 ASSIGN: '=';
 PLUS: '+';
@@ -120,6 +147,7 @@ LBRACE: '{';
 RBRACE: '}';
 COMMA: ',';
 SEMI: ';';
+COLON: ':';
 
 fragment HEX_DIGIT : [0-9a-fA-F];
 HEX_COLOR : '#' HEX_DIGIT+ ;

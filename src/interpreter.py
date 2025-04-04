@@ -8,6 +8,8 @@ from GrammarParser import GrammarParser
 from GrammarVisitor import GrammarVisitor
 
 from graphics import GraphicsController
+from shape import *
+
 
 class ReturnValue(Exception):
     def __init__(self, value=None): self.value = value
@@ -89,7 +91,6 @@ class CustomInterpreterVisitor(GrammarVisitor):
 
     def visitProgram(self, ctx:GrammarParser.ProgramContext):
         self.graphics_controller.start_display()
-        self.graphics_controller.set_window_size(800, 800)
         self.graphics_controller.set_background_color((125, 125, 255))
         try:
             for statement in ctx.statement():
@@ -290,6 +291,8 @@ class CustomInterpreterVisitor(GrammarVisitor):
             return self.visit(ctx.functionCall())
         if ctx.expression():
             return self.visit(ctx.expression())
+        if ctx.shapeLiteral():
+            return self.visit(ctx.shapeLiteral())
 
         raise RuntimeError("Unhandled primary expression type")
 
@@ -371,9 +374,70 @@ class CustomInterpreterVisitor(GrammarVisitor):
         else:
             raise TypeError("Unsupported color literal type")
 
+    def visitShapeLiteral(self, ctx: GrammarParser.ShapeLiteralContext):
+        if ctx.rectangleLiteral():
+            return self.visit(ctx.rectangleLiteral())
+        elif ctx.circleLiteral():
+            return self.visit(ctx.circleLiteral())
+        elif ctx.triangleLiteral():
+            return self.visit(ctx.triangleLiteral())
+        elif ctx.lineLiteral():
+            return self.visit(ctx.lineLiteral())
+        else:
+            raise TypeError("Unknown shape literal type")
+
+    def visitRectangleLiteral(self, ctx: GrammarParser.RectangleLiteralContext):
+        args_dict = {}
+        if ctx.namedArgumentList():
+            args_dict = self.visit(ctx.namedArgumentList()) # Get dict of name:value
+        try:
+            return Rectangle(**args_dict)
+        except Exception as e: # Catch potential errors during object creation
+             raise RuntimeError(f"Error creating rectangle: {e}") from e
+
+    def visitCircleLiteral(self, ctx: GrammarParser.CircleLiteralContext):
+        args_dict = {}
+        if ctx.namedArgumentList():
+            args_dict = self.visit(ctx.namedArgumentList())
+        try:
+            return Circle(**args_dict)
+        except Exception as e:
+             raise RuntimeError(f"Error creating circle: {e}") from e
+
+    def visitTriangleLiteral(self, ctx: GrammarParser.TriangleLiteralContext):
+        args_dict = {}
+        if ctx.namedArgumentList():
+            args_dict = self.visit(ctx.namedArgumentList())
+        try:
+            return Triangle(**args_dict)
+        except Exception as e:
+             raise RuntimeError(f"Error creating triangle: {e}") from e
+
+    def visitLineLiteral(self, ctx: GrammarParser.LineLiteralContext):
+        args_dict = {}
+        if ctx.namedArgumentList():
+            args_dict = self.visit(ctx.namedArgumentList())
+        try:
+            return Line(**args_dict)
+        except Exception as e:
+             raise RuntimeError(f"Error creating line: {e}") from e
+
+    def visitNamedArgumentList(self, ctx: GrammarParser.NamedArgumentListContext):
+        args_dict = {}
+        for arg_ctx in ctx.namedArgument():
+            name, value = self.visit(arg_ctx)
+            if name in args_dict:
+                print(f"Warning: Duplicate argument name '{name}' provided.")
+            args_dict[name] = value
+        return args_dict
+
+    def visitNamedArgument(self, ctx: GrammarParser.NamedArgumentContext):
+        name = ctx.IDENTIFIER().getText()
+        value = self.visit(ctx.expression())
+        return name, value
 def setup_builtin_functions(interpreter: CustomInterpreterVisitor, graphics_controller: GraphicsController):
     interpreter.add_builtin_function('print', builtin_print)
-    interpreter.add_builtin_function('rect', lambda x,y,w,h,color: graphics_controller.draw_rectangle(x,y,w,h,color))
+    interpreter.add_builtin_function('draw', lambda x, y, shape: graphics_controller.draw_shape(x, y, shape))
 
     interpreter.add_property('width', lambda width: graphics_controller.set_window_width(width))
     interpreter.add_property('height', lambda height: graphics_controller.set_window_height(height))

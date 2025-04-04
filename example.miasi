@@ -7,6 +7,10 @@ proc get_value() {
     return -5;
 }
 
+proc get_rect() {
+    return Rectangle{width: 50, height: 200, color: #abc123};
+}
+
 print(get_value());
 
 let x = 2 + 2 * 2;
@@ -41,7 +45,10 @@ while ( i == i ) {
 }
 
 let color = #ff0000;
-rect(100, 100, 100, 100, color);
-rect(500, 500, 50, 50, #00FF00);
+let rect = get_rect();
+let circ = Circle{radius: 100, color: #00FF00};
+draw(100, 100, rect);
+draw(500, 500, rect);
+draw(200, 200, circ);
 set width 100;
 set bg_color #0000FF;
