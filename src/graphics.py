@@ -1,8 +1,7 @@
 import threading
 import queue
 
-import arcade
-
+from interpreter import Vec2
 from shape import *
 
 class GameView(arcade.View):
@@ -47,6 +46,13 @@ class GameView(arcade.View):
                 self.controller.interpreter_visitor.execute_event('update', [delta_time])
             except Exception as e:
                 print(f"Error scheduling update handler: {e}")
+
+    def on_mouse_release(self, x: int, y: int, button: int, modifiers: int) -> bool | None:
+        if self.controller and self.controller.interpreter_visitor:
+            try:
+                self.controller.interpreter_visitor.execute_event('click', [Vec2(x, y), button, modifiers])
+            except Exception as e:
+                print(f"Error scheduling click handler: {e}")
 
     def on_draw(self):
         self.clear(self.background_color)

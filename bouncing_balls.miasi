@@ -1,0 +1,52 @@
+set bg_color #f2eeda;
+
+let gravity = (0, -980);
+let restitution = 0.7;
+let floorY = 0;
+
+let ball_shapes = [];
+let ball_positions = [];
+let ball_velocities = [];
+
+proc create_ball(position) {
+    let velocity = (0, 0);
+    let shape = Circle{ radius: 20, color: random_color() };
+
+    push(ball_shapes, shape);
+    push(ball_positions, position);
+    push(ball_velocities, velocity);
+    draw(position, shape);
+}
+
+on click(pos, button, modifiers) {
+    create_ball(pos);
+}
+
+on update(dt) {
+    let i = 0;
+    while (i < len(ball_shapes)) {
+        let pos = ball_positions[i];
+        let vel = ball_velocities[i];
+        let shape = ball_shapes[i];
+
+        vel.x = vel.x + gravity.x * dt;
+        vel.y = vel.y + gravity.y * dt;
+
+        pos.x = pos.x + vel.x * dt;
+        pos.y = pos.y + vel.y * dt;
+
+        let radius = shape.radius;
+        if (pos.y - radius <= floorY) {
+            pos.y = floorY + radius;
+            vel.y = -vel.y * restitution;
+            vel.x = vel.x * 0.99;
+        }
+
+        ball_positions[i] = pos;
+        ball_velocities[i] = vel;
+
+        i = i + 1;
+    }
+}
+
+print("Click to create bouncing balls!");

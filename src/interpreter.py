@@ -1,6 +1,12 @@
 import sys
 import codecs
 import traceback
+import random
+
+class Vec2:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
 
 from antlr4 import CommonTokenStream, FileStream
 from antlr4.error.ErrorListener import ErrorListener
@@ -11,12 +17,6 @@ from GrammarVisitor import GrammarVisitor
 
 from graphics import GraphicsController
 from shape import *
-
-class Point:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
 
 class ReturnValue(Exception):
     def __init__(self, value=None): self.value = value
@@ -148,9 +148,9 @@ class CustomInterpreterVisitor(GrammarVisitor):
                 value = self.visit(ctx.expression())
                 setter_func(value)
             except Exception as e:
-                raise InterpreterRuntimeError(f"Error setting property '{name}': {e}", ctx.expression()) from e
+                raise InterpreterRuntimeError(f"Error setting property '{name}': {e}", ctx) from e
         else:
-            raise InterpreterRuntimeError(f"Unknown property '{name}'. Cannot be set.", ctx.IDENTIFIER())
+            raise InterpreterRuntimeError(f"Unknown property '{name}'. Cannot be set.", ctx)
 
         return None
 
@@ -408,7 +408,7 @@ class CustomInterpreterVisitor(GrammarVisitor):
             if ctx.IDENTIFIER().getText() in self.functions:
                 return ctx.IDENTIFIER().getText()
 
-            raise NameError(f"The name '{name}' is not defined")
+            raise InterpreterRuntimeError(f"The name '{ctx.IDENTIFIER().getText()}' is not defined", ctx)
         if ctx.literal():
             return self.visit(ctx.literal())
         if ctx.expression():
@@ -418,7 +418,7 @@ class CustomInterpreterVisitor(GrammarVisitor):
         if ctx.arrayLiteral():
             return self.visit(ctx.arrayLiteral())
 
-        raise RuntimeError("Unhandled primary expression type")
+        raise InterpreterRuntimeError("Unsupported atom", ctx)
 
     def visitPostfixExpr(self, ctx: GrammarParser.PostfixExprContext):
         if ctx.atom():
@@ -536,7 +536,7 @@ class CustomInterpreterVisitor(GrammarVisitor):
     def visitPointLiteral(self, ctx:GrammarParser.PointLiteralContext):
         x = self.visit(ctx.x)
         y = self.visit(ctx.y)
-        return Point(x, y)
+        return Vec2(x, y)
 
     def visitColorLiteral(self, ctx: GrammarParser.ColorLiteralContext):
         if ctx.HEX_COLOR():
@@ -664,11 +664,22 @@ class CustomInterpreterVisitor(GrammarVisitor):
 def get_range(left, right):
     return range(left, right)
 
+def get_len(arr):
+    return len(arr)
+
+def get_random_color():
+    r = random.randint(0, 255)
+    g = random.randint(0, 255)
+    b = random.randint(0, 255)
+    return r, g, b
+
 def setup_builtin_functions(interpreter: CustomInterpreterVisitor, graphics_controller: GraphicsController):
     interpreter.add_builtin_function('print', builtin_print)
     interpreter.add_builtin_function('draw', lambda point, shape: graphics_controller.draw_shape(point, shape))
     interpreter.add_builtin_function('push', lambda arr, value: arr.append(value))
     interpreter.add_builtin_function('range', get_range)
+    interpreter.add_builtin_function('len', get_len)
+    interpreter.add_builtin_function('random_color', get_random_color)
 
     interpreter.add_property('width', lambda width: graphics_controller.set_window_width(width))
     interpreter.add_property('height', lambda height: graphics_controller.set_window_height(height))
