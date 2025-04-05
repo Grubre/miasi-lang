@@ -15,7 +15,10 @@ statement: functionDefinition
          | breakStatement
          | continueStatement
          | setStatement
+         | forStatement
          ;
+
+forStatement : FOR IDENTIFIER IN expression statement;
 
 functionDefinition: PROC IDENTIFIER LPAREN parameterList? RPAREN blockStatement;
 parameterList: IDENTIFIER (COMMA IDENTIFIER)*;
@@ -128,6 +131,8 @@ OR: 'or';
 NOT: 'not';
 SET: 'set';
 RGB: 'rgb';
+FOR: 'for';
+IN: 'in';
 
 RECTANGLE: 'Rectangle';
 CIRCLE: 'Circle';

@@ -179,6 +179,26 @@ class CustomInterpreterVisitor(GrammarVisitor):
             self.visit(ctx.statement(1))
         return None
 
+    def visitForStatement(self, ctx: GrammarParser.ForStatementContext):
+        variable = ctx.IDENTIFIER().getText()
+        iterable = self.visit(ctx.expression())
+
+        if not isinstance(iterable, list):
+            raise InterpreterRuntimeError(f"Type Error: Cannot iterate over non-array type {type(iterable).__name__}",
+                                          ctx.expression())
+
+        for value in iterable:
+            self.enter_scope()
+            try:
+                self.declare_variable(variable, value)
+                self.visit(ctx.statement())
+            except BreakLoop:
+                break
+            except ContinueLoop:
+                continue
+
+            self.exit_scope()
+
     def visitWhileStatement(self, ctx: GrammarParser.WhileStatementContext):
         while True:
             try:
