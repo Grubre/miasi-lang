@@ -663,6 +663,7 @@ class CustomInterpreterVisitor(GrammarVisitor):
 def setup_builtin_functions(interpreter: CustomInterpreterVisitor, graphics_controller: GraphicsController):
     interpreter.add_builtin_function('print', builtin_print)
     interpreter.add_builtin_function('draw', lambda point, shape: graphics_controller.draw_shape(point, shape))
+    interpreter.add_builtin_function('push', lambda arr, value: arr.append(value))
 
     interpreter.add_property('width', lambda width: graphics_controller.set_window_width(width))
     interpreter.add_property('height', lambda height: graphics_controller.set_window_height(height))

@@ -2,9 +2,10 @@ set bg_color #f2eeda;
 
 let rectangle = Rectangle{width: 100, height: 100, color: #FF0000};
 let point = (100, 100);
+let dx = 100;
 
 on update(dt) {
-    point.x = point.x + 50 * dt;
+    point.x = point.x + dx * dt;
 }
 
 draw(point, rectangle);
