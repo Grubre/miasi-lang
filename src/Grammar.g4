@@ -112,7 +112,11 @@ addOp: PLUS | MINUS;
 mulOp: MUL | DIV | MOD;
 
 // Literal values
-literal: NUMBER | BOOLEAN | colorLiteral;
+literal
+    : NUMBER
+    | BOOLEAN
+    | colorLiteral
+    | STRING;
 
 colorLiteral: rgbColor | HEX_COLOR;
 
@@ -166,6 +170,10 @@ RBRACKET: ']';
 COMMA: ',';
 SEMI: ';';
 COLON: ':';
+
+STRING
+    : '"'  (~'"' | '\\"')*? '"'
+    ;
 
 fragment HEX_DIGIT : [0-9a-fA-F];
 HEX_COLOR : '#' HEX_DIGIT+ ;

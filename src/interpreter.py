@@ -1,4 +1,5 @@
 import sys
+import codecs
 import traceback
 
 from antlr4 import CommonTokenStream, FileStream
@@ -441,6 +442,11 @@ class CustomInterpreterVisitor(GrammarVisitor):
             return True if bool_str == 'true' else False
         elif ctx.colorLiteral():
             return self.visitColorLiteral(ctx.colorLiteral())
+        elif ctx.STRING():
+            string_literal = ctx.STRING().getText()
+            value_inside_quotes = string_literal[1:-1]
+            processed_value, _ = codecs.unicode_escape_decode(value_inside_quotes)
+            return processed_value
         else:
             raise TypeError("Unsupported literal type")
 

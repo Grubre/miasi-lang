@@ -49,7 +49,7 @@ for i in array {
     print(i);
 }
 
-print(array);
+print("\"Hello World\"");
 let color = #ff0000;
 let rect = get_rect();
 let circ = Circle{radius: 100, color: #00FF00};
