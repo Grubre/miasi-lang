@@ -235,9 +235,10 @@ class CustomInterpreterVisitor(GrammarVisitor):
         variable = ctx.IDENTIFIER().getText()
         iterable = self.visit(ctx.expression())
 
-        if not isinstance(iterable, list):
-            raise InterpreterRuntimeError(f"Type Error: Cannot iterate over non-array type {type(iterable).__name__}",
-                                          ctx.expression())
+        try:
+            iter(iterable)
+        except:
+            raise InterpreterRuntimeError(f"Type Error: {type(iterable).__name__} is not iterable", ctx.expression())
 
         for value in iterable:
             self.enter_scope()
@@ -660,10 +661,14 @@ class CustomInterpreterVisitor(GrammarVisitor):
         finally:
             self.exit_scope()
 
+def get_range(left, right):
+    return range(left, right)
+
 def setup_builtin_functions(interpreter: CustomInterpreterVisitor, graphics_controller: GraphicsController):
     interpreter.add_builtin_function('print', builtin_print)
     interpreter.add_builtin_function('draw', lambda point, shape: graphics_controller.draw_shape(point, shape))
     interpreter.add_builtin_function('push', lambda arr, value: arr.append(value))
+    interpreter.add_builtin_function('range', get_range)
 
     interpreter.add_property('width', lambda width: graphics_controller.set_window_width(width))
     interpreter.add_property('height', lambda height: graphics_controller.set_window_height(height))

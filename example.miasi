@@ -1,11 +1,17 @@
 set bg_color #f2eeda;
 
-let rectangle = Rectangle{width: 100, height: 100, color: #FF0000};
-let point = (100, 100);
-let dx = 100;
+let color = #FF0000;
 
-on update(dt) {
-    point.x = point.x + dx * dt;
+let shapes = [];
+let positions = [];
+
+proc create_circle(position) {
+    let circle = Circle{radius: 50, color: color};
+    push(positions, position);
+    push(shapes, circle);
+    draw(position, circle);
 }
 
-draw(point, rectangle);
+for i in range(0, 10) {
+    create_circle((i * 100, 100));
+}
