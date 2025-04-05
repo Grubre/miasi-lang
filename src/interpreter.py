@@ -87,6 +87,13 @@ class CustomInterpreterVisitor(GrammarVisitor):
 
         self.scopes[-1][name] = value
 
+    def print_scopes(self):
+        for i, scope in enumerate(self.scopes):
+            print(f"Scope {i}:")
+            for name, value in scope.items():
+                print(f"  {name}: {value}")
+            print()
+
     def assign_variable(self, name, value):
         for scope in reversed(self.scopes):
             if name in scope:
@@ -198,6 +205,28 @@ class CustomInterpreterVisitor(GrammarVisitor):
                 continue
 
             self.exit_scope()
+
+    def visitListComprehension(self, ctx:GrammarParser.ListComprehensionContext):
+        name = ctx.IDENTIFIER().getText()
+        iterable = self.visit(ctx.iterExpr)
+
+        output_arr = []
+
+        for item in iterable:
+            self.enter_scope()
+            self.declare_variable(name, item)
+            should_append = True
+
+            if ctx.condExpr:
+                should_append = bool(self.visit(ctx.condExpr))
+
+            if should_append:
+                value = self.visit(ctx.outputExpr)
+                output_arr.append(value)
+
+            self.exit_scope()
+
+        return output_arr
 
     def visitWhileStatement(self, ctx: GrammarParser.WhileStatementContext):
         while True:
@@ -335,7 +364,8 @@ class CustomInterpreterVisitor(GrammarVisitor):
             except IndexError:
                 raise InterpreterRuntimeError(f"Index Error: Array index {index} out of bounds (length {len(arr)})",
                                               index_ctx)
-
+        if ctx.listComprehension():
+            return self.visit(ctx.listComprehension())
         if ctx.IDENTIFIER():
             return self.get_variable(ctx.IDENTIFIER().getText())
         if ctx.literal():

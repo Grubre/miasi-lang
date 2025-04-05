@@ -72,6 +72,11 @@ primaryExpr
     | shapeLiteral
     | arrayLiteral
     | primaryExpr LBRACKET expression RBRACKET
+    | listComprehension
+    ;
+
+listComprehension
+    : LBRACKET outputExpr=expression FOR IDENTIFIER IN iterExpr=expression (IF condExpr=expression)? RBRACKET
     ;
 
 arrayLiteral
