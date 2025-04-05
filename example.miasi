@@ -44,6 +44,9 @@ while ( i == i ) {
     break; }
 }
 
+let array = [1, 2];
+print(array);
+print(array[1]);
 let color = #ff0000;
 let rect = get_rect();
 let circ = Circle{radius: 100, color: #00FF00};

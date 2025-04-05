@@ -18,13 +18,13 @@ statement: functionDefinition
          ;
 
 functionDefinition: PROC IDENTIFIER LPAREN parameterList? RPAREN blockStatement;
-parameterList: IDENTIFIER (COMMA IDENTIFIER)*; // Simple list of names, no types yet
+parameterList: IDENTIFIER (COMMA IDENTIFIER)*;
 
 variableDeclaration: LET IDENTIFIER ASSIGN expression SEMI;
 
-assignmentStatement: IDENTIFIER ASSIGN expression SEMI; // Simple assignment to existing var
+assignmentStatement: IDENTIFIER ASSIGN expression SEMI;
 
-returnStatement: RETURN expression? SEMI; // Optional expression
+returnStatement: RETURN expression? SEMI;
 
 breakStatement: BREAK SEMI;
 
@@ -67,6 +67,12 @@ primaryExpr
     | functionCall
     | LPAREN expression RPAREN
     | shapeLiteral
+    | arrayLiteral
+    | primaryExpr LBRACKET expression RBRACKET
+    ;
+
+arrayLiteral
+    : LBRACKET argumentList? RBRACKET
     ;
 
 shapeLiteral
@@ -145,6 +151,8 @@ LPAREN: '(';
 RPAREN: ')';
 LBRACE: '{';
 RBRACE: '}';
+LBRACKET: '[';
+RBRACKET: ']';
 COMMA: ',';
 SEMI: ';';
 COLON: ':';
@@ -152,14 +160,11 @@ COLON: ':';
 fragment HEX_DIGIT : [0-9a-fA-F];
 HEX_COLOR : '#' HEX_DIGIT+ ;
 
-// Identifiers (start with letter or underscore, followed by letters, numbers, or underscores)
 IDENTIFIER: [a-zA-Z_] [a-zA-Z0-9_]*;
 
-// Literals
-BOOLEAN: TRUE | FALSE; // Defined via keywords
-NUMBER: INT | FLOAT; // Define INT and FLOAT below
+BOOLEAN: TRUE | FALSE;
+NUMBER: INT | FLOAT;
 
-// Define FLOAT before INT to avoid ambiguity ('123' could be INT or start of FLOAT)
 fragment FLOAT: [0-9]+ '.' [0-9]* | '.' [0-9]+ ;
 fragment INT: [0-9]+ ;
 

@@ -21,6 +21,7 @@ class GameView(arcade.View):
                 color, = args
                 self.background_color = color
             elif cmd_type == "set_window_size":
+                # FIXME: This is broken for now
                 w, h = args
                 self.controller.set_window_size(w, h)
             elif cmd_type == "bg_color":

@@ -1,4 +1,5 @@
 import sys
+import traceback
 
 from antlr4 import CommonTokenStream, FileStream
 from antlr4.error.ErrorListener import ErrorListener
@@ -15,12 +16,22 @@ class ReturnValue(Exception):
     def __init__(self, value=None): self.value = value
 class BreakLoop(Exception): pass
 class ContinueLoop(Exception): pass
+class InterpreterRuntimeError(Exception):
+    def __init__(self, message, ctx): # Store context
+        super().__init__(message)
+        self.line = ctx.start.line if ctx else '?'
+        self.column = ctx.start.column if ctx else '?'
+        self.message = message
+
+    def __str__(self):
+        return f"Error:{self.line}:{self.column} - {self.message}"
+
 
 # --- Basic Error Listener ---
 # (Optional but recommended to get better error messages than default console)
 class BasicErrorListener(ErrorListener):
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
-        print(f"Syntax Error at Line {line}:{column} - {msg}", file=sys.stderr)
+        print(f"Error:{line}:{column} - Syntax Error: {msg}", file=sys.stderr)
         raise SyntaxError(f"Line {line}:{column} {msg}")
 
 def builtin_print(*args):
@@ -113,9 +124,9 @@ class CustomInterpreterVisitor(GrammarVisitor):
                 value = self.visit(ctx.expression())
                 setter_func(value)
             except Exception as e:
-                raise RuntimeError(f"Error setting property '{name}': {e}") from e
+                raise InterpreterRuntimeError(f"Error setting property '{name}': {e}", ctx.expression()) from e
         else:
-            raise NameError(f"Unknown property '{name}'. Cannot be set.")
+            raise InterpreterRuntimeError(f"Unknown property '{name}'. Cannot be set.", ctx.IDENTIFIER())
 
         return None
 
@@ -232,7 +243,7 @@ class CustomInterpreterVisitor(GrammarVisitor):
         if op == '>':  return left > right
         if op == '<=': return left <= right
         if op == '>=': return left >= right
-        raise TypeError(f"Unsupported comparison operator: {op}")
+        raise InterpreterRuntimeError(f"Unsupported comparison operator: {op}", ctx.compOp())
 
     def visitAdditiveExpr(self, ctx: GrammarParser.AdditiveExprContext):
         result = self.visit(ctx.multiplicativeExpr(0))
@@ -246,28 +257,31 @@ class CustomInterpreterVisitor(GrammarVisitor):
             elif op == '-':
                 result -= right
             else:
-                 raise TypeError(f"Unsupported additive operator: {op}")
+                 raise InterpreterRuntimeError(f"Unsupported additive operator: {op}", ctx.addOp(i-1))
         return result
 
     def visitMultiplicativeExpr(self, ctx: GrammarParser.MultiplicativeExprContext):
         result = self.visit(ctx.unaryExpr(0))
 
-        for i in range(1, len(ctx.unaryExpr())):
-            op = ctx.mulOp(i - 1).getText()
-            right = self.visit(ctx.unaryExpr(i))
-            if op == '*':
-                result *= right
-            elif op == '/':
-                if right == 0:
-                    raise ZeroDivisionError("Division by zero")
-                result /= right
-            elif op == '%':
-                if right == 0:
-                    raise ZeroDivisionError("Modulo by zero")
-                result %= right
-            else:
-                raise TypeError(f"Unsupported multiplicative operator: {op}")
-        return result
+        try:
+            for i in range(1, len(ctx.unaryExpr())):
+                op = ctx.mulOp(i - 1).getText()
+                right = self.visit(ctx.unaryExpr(i))
+                if op == '*':
+                    result *= right
+                elif op == '/':
+                    if right == 0:
+                        raise InterpreterRuntimeError("Division by zero", ctx.unaryExpr(i))
+                    result /= right
+                elif op == '%':
+                    if right == 0:
+                        raise InterpreterRuntimeError("Modulo by zero", ctx.unaryExpr(i))
+                    result %= right
+                else:
+                    raise InterpreterRuntimeError(f"Unsupported multiplicative operator: {op}", ctx.mulOp(i - 1))
+            return result
+        except TypeError as e:
+            raise InterpreterRuntimeError(f"Type Error: {e}", ctx) from e
 
     def visitUnaryExpr(self, ctx: GrammarParser.UnaryExprContext):
         if ctx.primaryExpr():
@@ -283,6 +297,25 @@ class CustomInterpreterVisitor(GrammarVisitor):
             raise TypeError("Unsupported unary operator")
 
     def visitPrimaryExpr(self, ctx: GrammarParser.PrimaryExprContext):
+        if ctx.LBRACKET():
+            arr_ctx = ctx.primaryExpr()
+            index_ctx = ctx.expression()
+
+            arr = self.visit(arr_ctx)
+            index = self.visit(index_ctx)
+
+            if not isinstance(arr, list):
+                raise InterpreterRuntimeError(f"Type Error: Cannot index non-array type {type(arr).__name__}",
+                                              index_ctx)
+            if not isinstance(index, int):
+                raise InterpreterRuntimeError(f"Type Error: Array index must be an integer, not {type(index).__name__}",
+                                              index_ctx)
+            try:
+                return arr[index]
+            except IndexError:
+                raise InterpreterRuntimeError(f"Index Error: Array index {index} out of bounds (length {len(arr)})",
+                                              index_ctx)
+
         if ctx.IDENTIFIER():
             return self.get_variable(ctx.IDENTIFIER().getText())
         if ctx.literal():
@@ -293,6 +326,8 @@ class CustomInterpreterVisitor(GrammarVisitor):
             return self.visit(ctx.expression())
         if ctx.shapeLiteral():
             return self.visit(ctx.shapeLiteral())
+        if ctx.arrayLiteral():
+            return self.visit(ctx.arrayLiteral())
 
         raise RuntimeError("Unhandled primary expression type")
 
@@ -435,6 +470,14 @@ class CustomInterpreterVisitor(GrammarVisitor):
         name = ctx.IDENTIFIER().getText()
         value = self.visit(ctx.expression())
         return name, value
+
+    def visitArrayLiteral(self, ctx: GrammarParser.ArrayLiteralContext):
+        arr = []
+        if ctx.argumentList():
+            arr = self.visit(ctx.argumentList())
+
+        return arr
+
 def setup_builtin_functions(interpreter: CustomInterpreterVisitor, graphics_controller: GraphicsController):
     interpreter.add_builtin_function('print', builtin_print)
     interpreter.add_builtin_function('draw', lambda x, y, shape: graphics_controller.draw_shape(x, y, shape))
@@ -472,15 +515,18 @@ def run_file(filename: str):
         else:
             print("Parsing failed. Halting execution.")
 
+
     except FileNotFoundError:
         print(f"Error: File not found: {filename}", file=sys.stderr)
+    except InterpreterRuntimeError as e:
+        print(e, file=sys.stderr)
     except NameError as e:
-        print(f"Runtime Error: {e}", file=sys.stderr)
-    except TypeError as e:
-        print(f"Runtime Error: {e}", file=sys.stderr)
-    except ZeroDivisionError as e:
-        print(f"Runtime Error: {e}", file=sys.stderr)
+        print(e, file=sys.stderr)
+    except SyntaxError as e:
+        print(f"Halting due to Syntax Error.", file=sys.stderr)
     except Exception as e:
-        print(f"An unexpected error occurred: {e}", file=sys.stderr)
-        import traceback
+        print(f"\n--- An Unexpected Internal Interpreter Error Occurred ---", file=sys.stderr)
+        print(f"Error Type: {type(e).__name__}", file=sys.stderr)
+        print(f"Error Details: {e}", file=sys.stderr)
+        print("-" * 50, file=sys.stderr)
         traceback.print_exc()
