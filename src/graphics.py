@@ -1,6 +1,8 @@
 import threading
 import queue
 
+import arcade
+
 from shape import *
 
 class GameView(arcade.View):
@@ -28,8 +30,8 @@ class GameView(arcade.View):
                 color, = args
                 self.background_color = color
             elif cmd_type == "draw":
-                x, y, shape, = args
-                self.shapes.append((x, y, shape))
+                point, shape, = args
+                self.shapes.append((point, shape))
 
             self.command_queue.task_done()
         except queue.Empty:
@@ -40,11 +42,18 @@ class GameView(arcade.View):
     def on_update(self, delta_time):
         self.process_commands()
 
+        if self.controller and self.controller.interpreter_visitor:
+            try:
+                self.controller.interpreter_visitor.execute_event('update', [delta_time])
+            except Exception as e:
+                print(f"Error scheduling update handler: {e}")
+
     def on_draw(self):
         self.clear(self.background_color)
 
-        for x, y, rect in self.shapes:
-            rect.draw(x, y)
+        for point, shape in self.shapes:
+            if shape.is_visible:
+                shape.draw(point.x, point.y)
 
     def on_key_press(self, key, modifiers):
         if key == arcade.key.ESCAPE:
@@ -59,6 +68,11 @@ class GraphicsController:
         self._arcade_thread = None
         self.command_queue = queue.Queue()
         self._stop_event = threading.Event()
+
+        self.interpreter_visitor = None
+
+    def add_visitor(self, visitor):
+        self.interpreter_visitor = visitor
 
     def start_display(self):
         if self.window is None:
@@ -79,8 +93,8 @@ class GraphicsController:
             self.game_view = None
             self._stop_event.set()
 
-    def draw_shape(self, x, y, shape: Shape):
-        self.command_queue.put(("draw", x, y, shape))
+    def draw_shape(self, point, shape: Shape):
+        self.command_queue.put(("draw", point, shape))
 
     def wait_for_display_close(self):
         if self._arcade_thread:

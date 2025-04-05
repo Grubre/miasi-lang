@@ -65,7 +65,6 @@ class CustomInterpreterVisitor(GrammarVisitor):
         self.scopes = [{}]
         self.properties = {}
         self.handled_events: dict[str, {}] = {}
-        self.registered_events: dict[str, {}] = {}
 
         self.graphics_controller = graphics_controller
 
@@ -176,16 +175,36 @@ class CustomInterpreterVisitor(GrammarVisitor):
         return None
 
     def visitAssignmentStatement(self, ctx: GrammarParser.AssignmentStatementContext):
-        name = self.visit(ctx.assignmentTarget())
-        value = self.visit(ctx.expression())
-        self.assign_variable(name, value)
+        lhs = self.visit(ctx.assignmentTarget())
+        rhs = self.visit(ctx.expression())
+
+        if isinstance(lhs, str):
+            self.assign_variable(lhs, rhs)
+        elif isinstance(lhs, tuple):
+            obj = lhs[0]
+
+            if isinstance(obj, list):
+                index = lhs[1]
+                obj[index] = rhs
+            elif isinstance(obj, object):
+                prop = lhs[1]
+                setattr(obj, prop, rhs)
+            else:
+                raise InterpreterRuntimeError(f"Unsupported assignment target type: {type(obj).__name__}", ctx.expression())
+
         return None
 
     def visitAssignmentTarget(self, ctx:GrammarParser.AssignmentTargetContext):
         if ctx.IDENTIFIER():
             return ctx.IDENTIFIER().getText()
         if ctx.postfixExpr():
-            return ctx.postfixExpr()
+            postfix_expr = ctx.postfixExpr()
+
+            if postfix_expr.LBRACKET(): # array indexing
+                return self.visit(postfix_expr.postfixExpr()), self.visit(postfix_expr.expression())
+
+            if postfix_expr.DOT(): # property lookup
+                return self.visit(postfix_expr.postfixExpr()), postfix_expr.IDENTIFIER().getText()
 
         raise InterpreterRuntimeError("Unsupported assignment target", ctx)
 
@@ -605,9 +624,6 @@ class CustomInterpreterVisitor(GrammarVisitor):
     def visitEventHandler(self, ctx:GrammarParser.EventHandlerContext):
         event_name = ctx.IDENTIFIER().getText()
 
-        if event_name not in self.registered_events:
-            raise InterpreterRuntimeError(f"Unknown event '{event_name}'", ctx)
-
         event = {
             'params': ctx.parameterList(),
             'body': ctx.blockStatement(),
@@ -618,9 +634,35 @@ class CustomInterpreterVisitor(GrammarVisitor):
 
         return None
 
+    def execute_event(self, event_name, event_args):
+        if event_name not in self.handled_events:
+            return
+
+        event = self.handled_events[event_name]
+        params = event['params']
+        body = event['body']
+        ctx = event['ctx']
+
+        param_names = [p.getText() for p in params.IDENTIFIER()] if params else []
+
+        if len(param_names) > len(event_args):
+            raise InterpreterRuntimeError(f"Incorrect number of arguments for event handler '{event_name}'. Expected {len(param_names)}, got {len(event_args)}", ctx)
+
+        try:
+            self.enter_scope()
+            if params:
+                for name, value in zip(param_names, event_args):
+                    self.declare_variable(name, value)
+
+            self.visit(body)
+        except ReturnValue as rv:
+            return rv.value
+        finally:
+            self.exit_scope()
+
 def setup_builtin_functions(interpreter: CustomInterpreterVisitor, graphics_controller: GraphicsController):
     interpreter.add_builtin_function('print', builtin_print)
-    interpreter.add_builtin_function('draw', lambda point, shape: graphics_controller.draw_shape(point.x, point.y, shape))
+    interpreter.add_builtin_function('draw', lambda point, shape: graphics_controller.draw_shape(point, shape))
 
     interpreter.add_property('width', lambda width: graphics_controller.set_window_width(width))
     interpreter.add_property('height', lambda height: graphics_controller.set_window_height(height))
@@ -645,6 +687,7 @@ def run_file(filename: str):
             print("Parsing successful. Starting interpretation...")
             graphics_controller = GraphicsController([800, 800])
             visitor = CustomInterpreterVisitor(graphics_controller)
+            graphics_controller.add_visitor(visitor)
             setup_builtin_functions(visitor, graphics_controller)
 
             visitor.visit(tree)

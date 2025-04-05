@@ -2,6 +2,7 @@ import arcade
 
 class Shape:
     def __init__(self, color=(0, 0, 0, 255)):
+        self.is_visible = True
         if isinstance(color, (list, tuple)) and len(color) == 4:
             self.color = tuple(int(max(0, min(255, c))) for c in color)
         elif isinstance(color, (list, tuple)) and len(color) == 3:
