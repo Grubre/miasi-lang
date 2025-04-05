@@ -16,7 +16,10 @@ statement: functionDefinition
          | continueStatement
          | setStatement
          | forStatement
+         | eventHandler
          ;
+
+eventHandler : ON IDENTIFIER LPAREN parameterList? RPAREN blockStatement;
 
 forStatement : FOR IDENTIFIER IN expression statement;
 
@@ -125,9 +128,11 @@ literal
     : NUMBER
     | BOOLEAN
     | colorLiteral
-    | STRING;
+    | STRING
+    | pointLiteral;
 
 colorLiteral: rgbColor | HEX_COLOR;
+pointLiteral: LPAREN x=expression COMMA y=expression RPAREN;
 
 rgbColor: RGB LPAREN r=expression COMMA g=expression COMMA b=expression RPAREN;
 
@@ -151,6 +156,7 @@ SET: 'set';
 RGB: 'rgb';
 FOR: 'for';
 IN: 'in';
+ON: 'on';
 
 RECTANGLE: 'Rectangle';
 CIRCLE: 'Circle';

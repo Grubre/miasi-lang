@@ -12,6 +12,11 @@ from GrammarVisitor import GrammarVisitor
 from graphics import GraphicsController
 from shape import *
 
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
 
 class ReturnValue(Exception):
     def __init__(self, value=None): self.value = value
@@ -59,6 +64,8 @@ class CustomInterpreterVisitor(GrammarVisitor):
         self.builtin_functions = {}
         self.scopes = [{}]
         self.properties = {}
+        self.handled_events: dict[str, {}] = {}
+        self.registered_events: dict[str, {}] = {}
 
         self.graphics_controller = graphics_controller
 
@@ -67,6 +74,12 @@ class CustomInterpreterVisitor(GrammarVisitor):
             raise NameError(f"Cannot add built-in function: Name '{name}' is already defined.")
 
         self.builtin_functions[name] = func
+
+    def register_event(self, name, func):
+        if name in self.handled_events:
+            raise NameError(f"Cannot register event: Name '{name}' is already registered.")
+
+
 
     def add_property(self, name, func):
         if name in self.properties:
@@ -402,7 +415,6 @@ class CustomInterpreterVisitor(GrammarVisitor):
     def property_obj_access(self, ctx: GrammarParser.PostfixExprContext):
         obj = self.visit(ctx.postfixExpr())
         prop_name = ctx.IDENTIFIER().getText()
-        print(f"Accessing property '{prop_name}' on object {obj}")
 
         try:
             prop = getattr(obj, prop_name)
@@ -433,14 +445,17 @@ class CustomInterpreterVisitor(GrammarVisitor):
         function_name = self.visit(ctx.postfixExpr())
 
         if (function_name not in self.functions) and (function_name not in self.builtin_functions):
-            raise NameError(f"Function '{function_name}' is not defined.")
+            raise InterpreterRuntimeError(f"Function '{function_name}' is not defined.", ctx)
 
         call_args = []
         if ctx.argumentList() is not None:
             call_args = self.visit(ctx.argumentList())
 
         if function_name in self.builtin_functions:
-            return self.builtin_functions[function_name](*call_args)
+            try:
+                return self.builtin_functions[function_name](*call_args)
+            except Exception as e:
+                raise InterpreterRuntimeError(f"Error calling builtin function '{function_name}': {e}", ctx) from e
 
         func_data = self.functions[function_name]
         params = func_data['params']
@@ -453,7 +468,7 @@ class CustomInterpreterVisitor(GrammarVisitor):
             arity = len(param_names)
 
         if arity != len(call_args):
-            raise TypeError(f"Incorrect number of arguments for function '{function_name}'. Expected {arity}, got {len(call_args)}")
+            raise InterpreterRuntimeError(f"Incorrect number of arguments for function '{function_name}'. Expected {arity}, got {len(call_args)}", ctx)
 
         # execute the function
         self.enter_scope()
@@ -493,8 +508,15 @@ class CustomInterpreterVisitor(GrammarVisitor):
             value_inside_quotes = string_literal[1:-1]
             processed_value, _ = codecs.unicode_escape_decode(value_inside_quotes)
             return processed_value
+        elif ctx.pointLiteral():
+            return self.visit(ctx.pointLiteral())
         else:
             raise TypeError("Unsupported literal type")
+
+    def visitPointLiteral(self, ctx:GrammarParser.PointLiteralContext):
+        x = self.visit(ctx.x)
+        y = self.visit(ctx.y)
+        return Point(x, y)
 
     def visitColorLiteral(self, ctx: GrammarParser.ColorLiteralContext):
         if ctx.HEX_COLOR():
@@ -580,9 +602,25 @@ class CustomInterpreterVisitor(GrammarVisitor):
 
         return arr
 
+    def visitEventHandler(self, ctx:GrammarParser.EventHandlerContext):
+        event_name = ctx.IDENTIFIER().getText()
+
+        if event_name not in self.registered_events:
+            raise InterpreterRuntimeError(f"Unknown event '{event_name}'", ctx)
+
+        event = {
+            'params': ctx.parameterList(),
+            'body': ctx.blockStatement(),
+            'ctx': ctx
+        }
+
+        self.handled_events[event_name] = event
+
+        return None
+
 def setup_builtin_functions(interpreter: CustomInterpreterVisitor, graphics_controller: GraphicsController):
     interpreter.add_builtin_function('print', builtin_print)
-    interpreter.add_builtin_function('draw', lambda x, y, shape: graphics_controller.draw_shape(x, y, shape))
+    interpreter.add_builtin_function('draw', lambda point, shape: graphics_controller.draw_shape(point.x, point.y, shape))
 
     interpreter.add_property('width', lambda width: graphics_controller.set_window_width(width))
     interpreter.add_property('height', lambda height: graphics_controller.set_window_height(height))

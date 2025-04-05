@@ -1,61 +1,6 @@
-proc do_smth(y) {
-    print(y);
-    print(z);
-}
+set bg_color #f2eeda;
 
-proc get_value() {
-    return -5;
-}
+let rectangle = Rectangle{width: 100, height: 100, color: #FF0000};
+let point = (100, 100);
 
-proc get_rect() {
-    return Rectangle{width: 50, height: 200, color: #abc123};
-}
-
-print(get_value());
-
-let x = 2 + 2 * 2;
-
-print(x, x);
-
-let z = 25;
-x = 7;
-
-if(x > 5) {
-    print(1);
-}
-do_smth(x);
-{
-    let x = 8;
-    print(x);
-}
-
-let i = 0;
-while(not (i > 10)) {
-    print(i);
-    i = i + 1;
-}
-print(i);
-
-i = 20;
-while ( i == i ) {
-    print(i);
-    i = i + 1;
-    if (i > 50) {
-    break; }
-}
-
-let array = [i for i in [1,2,3,4,5] if (i % 2 == 1)];
-for i in array {
-    print(i);
-}
-
-print("Hello World");
-let color = #ff0000;
-let rect = get_rect();
-print(rect.width);
-let circ = Circle{radius: 100, color: #00FF00};
-draw(100, 100, rect);
-draw(500, 500, rect);
-draw(200, 200, circ);
-set width 100;
-set bg_color #0000FF;
+draw(point, rectangle);
