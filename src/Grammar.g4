@@ -25,7 +25,11 @@ parameterList: IDENTIFIER (COMMA IDENTIFIER)*;
 
 variableDeclaration: LET IDENTIFIER ASSIGN expression SEMI;
 
-assignmentStatement: IDENTIFIER ASSIGN expression SEMI;
+assignmentStatement: assignmentTarget ASSIGN expression SEMI;
+assignmentTarget
+    : IDENTIFIER
+    | postfixExpr
+    ;
 
 returnStatement: RETURN expression? SEMI;
 
@@ -62,18 +66,24 @@ multiplicativeExpr
 
 unaryExpr
     : (NOT | MINUS) unaryExpr
-    | primaryExpr;
+    | postfixExpr;
 
-primaryExpr
+atom
     : literal
     | IDENTIFIER
-    | functionCall
     | LPAREN expression RPAREN
     | shapeLiteral
     | arrayLiteral
-    | primaryExpr LBRACKET expression RBRACKET
     | listComprehension
     ;
+
+postfixExpr
+    : postfixExpr LBRACKET expression RBRACKET // array indexing a[10], a[i], etc.
+    | postfixExpr LPAREN argumentList? RPAREN  // function call get_value(), f(x), etc.
+    | atom
+    ;
+
+argumentList: expression (COMMA expression)*;
 
 listComprehension
     : LBRACKET outputExpr=expression FOR IDENTIFIER IN iterExpr=expression (IF condExpr=expression)? RBRACKET
@@ -104,8 +114,6 @@ triangleLiteral : TRIANGLE LBRACE namedArgumentList? RBRACE;
 
 lineLiteral : LINE LBRACE namedArgumentList? RBRACE;
 
-functionCall: IDENTIFIER LPAREN argumentList? RPAREN;
-argumentList: expression (COMMA expression)*;
 
 compOp: EQ | NEQ | LT | GT | LTE | GTE;
 addOp: PLUS | MINUS;

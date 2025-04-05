@@ -83,6 +83,10 @@ class CustomInterpreterVisitor(GrammarVisitor):
             self.scopes.pop()
 
     def declare_variable(self, name, value):
+        if name in self.builtin_functions:
+            raise NameError(f"Variable '{name}' is a reserved built-in function name.")
+        if name in self.functions:
+            raise NameError(f"Variable '{name}' is already a declared function.")
         if name in self.scopes[-1]:
             print(f"Warning: Variable '{name}' already declared in this scope (shadowing).")
 
@@ -106,7 +110,7 @@ class CustomInterpreterVisitor(GrammarVisitor):
         for scope in reversed(self.scopes):
             if name in scope:
                 return scope[name]
-        raise NameError(f"Variable '{name}' is not defined")
+        return None
 
     def visitProgram(self, ctx:GrammarParser.ProgramContext):
         self.graphics_controller.start_display()
@@ -159,10 +163,18 @@ class CustomInterpreterVisitor(GrammarVisitor):
         return None
 
     def visitAssignmentStatement(self, ctx: GrammarParser.AssignmentStatementContext):
-        name = ctx.IDENTIFIER().getText()
+        name = self.visit(ctx.assignmentTarget())
         value = self.visit(ctx.expression())
         self.assign_variable(name, value)
         return None
+
+    def visitAssignmentTarget(self, ctx:GrammarParser.AssignmentTargetContext):
+        if ctx.IDENTIFIER():
+            return ctx.IDENTIFIER().getText()
+        if ctx.postfixExpr():
+            return ctx.postfixExpr()
+
+        raise InterpreterRuntimeError("Unsupported assignment target", ctx)
 
     def visitReturnStatement(self, ctx: GrammarParser.ReturnStatementContext):
         value = None
@@ -334,8 +346,8 @@ class CustomInterpreterVisitor(GrammarVisitor):
             raise InterpreterRuntimeError(f"Type Error: {e}", ctx) from e
 
     def visitUnaryExpr(self, ctx: GrammarParser.UnaryExprContext):
-        if ctx.primaryExpr():
-            return self.visit(ctx.primaryExpr())
+        if ctx.postfixExpr():
+            return self.visit(ctx.postfixExpr())
 
         operand = self.visit(ctx.unaryExpr())
 
@@ -346,33 +358,26 @@ class CustomInterpreterVisitor(GrammarVisitor):
         else:
             raise TypeError("Unsupported unary operator")
 
-    def visitPrimaryExpr(self, ctx: GrammarParser.PrimaryExprContext):
-        if ctx.LBRACKET():
-            arr_ctx = ctx.primaryExpr()
-            index_ctx = ctx.expression()
-
-            arr = self.visit(arr_ctx)
-            index = self.visit(index_ctx)
-
-            if not isinstance(arr, list):
-                raise InterpreterRuntimeError(f"Type Error: Cannot index non-array type {type(arr).__name__}",
-                                              index_ctx)
-            if not isinstance(index, int):
-                raise InterpreterRuntimeError(f"Type Error: Array index must be an integer, not {type(index).__name__}",
-                                              index_ctx)
-            try:
-                return arr[index]
-            except IndexError:
-                raise InterpreterRuntimeError(f"Index Error: Array index {index} out of bounds (length {len(arr)})",
-                                              index_ctx)
+    def visitAtom(self, ctx: GrammarParser.AtomContext):
         if ctx.listComprehension():
             return self.visit(ctx.listComprehension())
         if ctx.IDENTIFIER():
-            return self.get_variable(ctx.IDENTIFIER().getText())
+            # first check if it's a variable
+            name = self.get_variable(ctx.IDENTIFIER().getText())
+            if name is not None:
+                return name
+
+            # then if it's a builtin-function
+            if ctx.IDENTIFIER().getText() in self.builtin_functions:
+                return ctx.IDENTIFIER().getText()
+
+            # then if it's a regular function
+            if ctx.IDENTIFIER().getText() in self.functions:
+                return ctx.IDENTIFIER().getText()
+
+            raise NameError(f"The name '{name}' is not defined")
         if ctx.literal():
             return self.visit(ctx.literal())
-        if ctx.functionCall():
-            return self.visit(ctx.functionCall())
         if ctx.expression():
             return self.visit(ctx.expression())
         if ctx.shapeLiteral():
@@ -382,8 +387,37 @@ class CustomInterpreterVisitor(GrammarVisitor):
 
         raise RuntimeError("Unhandled primary expression type")
 
-    def visitFunctionCall(self, ctx: GrammarParser.FunctionCallContext):
-        function_name = ctx.IDENTIFIER().getText()
+    def visitPostfixExpr(self, ctx: GrammarParser.PostfixExprContext):
+        if ctx.atom():
+            return self.visit(ctx.atom())
+        if ctx.LBRACKET():
+            return self.array_index(ctx)
+        if ctx.LPAREN():
+            return self.function_call(ctx)
+
+        raise RuntimeError("Unhandled postfix expression type")
+
+    def array_index(self, ctx: GrammarParser.PostfixExprContext):
+        arr_ctx = ctx.postfixExpr()
+        index_ctx = ctx.expression()
+
+        arr = self.visit(arr_ctx)
+        index = self.visit(index_ctx)
+
+        if not isinstance(arr, list):
+            raise InterpreterRuntimeError(f"Type Error: Cannot index non-array type {type(arr).__name__}",
+                                          index_ctx)
+        if not isinstance(index, int):
+            raise InterpreterRuntimeError(f"Type Error: Array index must be an integer, not {type(index).__name__}",
+                                          index_ctx)
+        try:
+            return arr[index]
+        except IndexError:
+            raise InterpreterRuntimeError(f"Index Error: Array index {index} out of bounds (length {len(arr)})",
+                                          index_ctx)
+
+    def function_call(self, ctx: GrammarParser.PostfixExprContext):
+        function_name = self.visit(ctx.postfixExpr())
 
         if (function_name not in self.functions) and (function_name not in self.builtin_functions):
             raise NameError(f"Function '{function_name}' is not defined.")
@@ -415,7 +449,6 @@ class CustomInterpreterVisitor(GrammarVisitor):
         try:
             if params:
                 for name, value in zip(param_names, call_args):
-                    print(f"Assigning parameter '{name}' to value {value}" )
                     self.declare_variable(name, value)
 
             self.visit(body)
