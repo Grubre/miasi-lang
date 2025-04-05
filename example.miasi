@@ -52,6 +52,7 @@ for i in array {
 print("Hello World");
 let color = #ff0000;
 let rect = get_rect();
+print(rect.width);
 let circ = Circle{radius: 100, color: #00FF00};
 draw(100, 100, rect);
 draw(500, 500, rect);

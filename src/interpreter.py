@@ -394,8 +394,21 @@ class CustomInterpreterVisitor(GrammarVisitor):
             return self.array_index(ctx)
         if ctx.LPAREN():
             return self.function_call(ctx)
+        if ctx.DOT():
+            return self.property_obj_access(ctx)
 
         raise RuntimeError("Unhandled postfix expression type")
+
+    def property_obj_access(self, ctx: GrammarParser.PostfixExprContext):
+        obj = self.visit(ctx.postfixExpr())
+        prop_name = ctx.IDENTIFIER().getText()
+        print(f"Accessing property '{prop_name}' on object {obj}")
+
+        try:
+            prop = getattr(obj, prop_name)
+            return prop
+        except AttributeError as e:
+            raise InterpreterRuntimeError(f"Object '{ctx.postfixExpr().getText()}' has no property '{prop_name}'", ctx) from e
 
     def array_index(self, ctx: GrammarParser.PostfixExprContext):
         arr_ctx = ctx.postfixExpr()

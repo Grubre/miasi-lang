@@ -80,6 +80,7 @@ atom
 postfixExpr
     : postfixExpr LBRACKET expression RBRACKET // array indexing a[10], a[i], etc.
     | postfixExpr LPAREN argumentList? RPAREN  // function call get_value(), f(x), etc.
+    | postfixExpr DOT IDENTIFIER               // property access rectangle.weight, etc.
     | atom
     ;
 
@@ -178,6 +179,7 @@ RBRACKET: ']';
 COMMA: ',';
 SEMI: ';';
 COLON: ':';
+DOT: '.';
 
 STRING
     : '"'  (~'"' | '\\"')*? '"'
