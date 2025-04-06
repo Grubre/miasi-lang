@@ -1,0 +1,67 @@
+set bg_color #101025;
+
+let cols = 15;
+let rows = 10;
+let padding = 50;
+let spacingX = (get_window_width() - 2 * padding) / (cols - 1);
+let spacingY = (get_window_height() - 2 * padding) / (rows - 1);
+let baseRadius = 10;
+let pulseAmplitude = 8;
+let pulseFrequency = 2.0;
+let timeScale = 1.0;
+
+let shapes = [];
+let positions = []; // Store the actual position objects
+
+proc setupGrid() {
+    let i = 0;
+    while (i < cols) {
+        let j = 0;
+        while (j < rows) {
+            let x = padding + i * spacingX;
+            let y = padding + j * spacingY;
+            let r = i / cols * 255;
+            let g = j / rows * 255;
+            let b = 150;
+            let shapeColor = rgb(r, g, b);
+
+            let pos = (x, y); // Or vec2(x, y)
+            let circle = Circle{
+                radius: baseRadius,
+                color: shapeColor,
+                baseRadius: baseRadius, // Store base radius if needed
+                gridX: i,
+                gridY: j
+            };
+
+            push(shapes, circle);
+            push(positions, pos);
+
+            draw(pos, circle);
+
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    print("Grid setup complete.");
+}
+
+let currentTime = 0;
+on update(dt) {
+    let i = 0;
+    currentTime = currentTime + dt * timeScale;
+    while (i < len(shapes)) {
+        let shape = shapes[i];
+        let angle = currentTime * pulseFrequency + shape.gridX * 0.5;
+        let oscillation = sin(angle);
+        let newRadius = shape.baseRadius + pulseAmplitude * oscillation;
+
+        if (newRadius < 1) { newRadius = 1; }
+
+        shape.radius = newRadius;
+        i = i + 1;
+    }
+}
+
+setupGrid();
+print("Pulsing grid running...");

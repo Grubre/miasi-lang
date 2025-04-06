@@ -1,8 +1,10 @@
 import arcade
 
 class Shape:
-    def __init__(self, color=(0, 0, 0, 255)):
+    def __init__(self, properties, color=(0, 0, 0, 255)):
         self.is_visible = True
+        for prop in properties:
+            setattr(self, prop, properties[prop])
         if isinstance(color, (list, tuple)) and len(color) == 4:
             self.color = tuple(int(max(0, min(255, c))) for c in color)
         elif isinstance(color, (list, tuple)) and len(color) == 3:
@@ -19,10 +21,9 @@ class Shape:
 
 class Rectangle(Shape):
     def __init__(self, width, height, color, **kwargs):
-        super().__init__(color)
+        super().__init__(kwargs, color)
         self.width = width
         self.height = height
-        if kwargs: print(f"Warning: Unknown arguments for rectangle: {kwargs}")
 
     def draw(self,x,y):
         rect = arcade.rect.XYWH(
@@ -35,20 +36,17 @@ class Rectangle(Shape):
 
 class Circle(Shape):
     def __init__(self, radius=10, color=(0, 0, 0, 255), **kwargs):
-        super().__init__(color)
+        super().__init__(kwargs, color)
         self.radius = radius
-        if kwargs: print(f"Warning: Unknown arguments for circle: {kwargs}")
 
     def draw(self,x,y):
         arcade.draw_circle_filled(x, y, self.radius, self.color)
 
 class Triangle(Shape):
     def __init__(self, p2=(10,0), p3=(5,10), color=(0, 0, 0, 255), **kwargs):
-        super().__init__(color)
+        super().__init__(kwargs, color)
         self.p2 = p2
         self.p3 = p3
-        if kwargs:
-            print(f"Warning: Unknown arguments for triangle: {kwargs}")
 
 
     def draw(self, x, y):
@@ -62,11 +60,10 @@ class Triangle(Shape):
 
 class Line(Shape):
      def __init__(self, x2=10, y2=10, thickness=1, color=(0, 0, 0, 255), **kwargs):
-         super().__init__(color)
+         super().__init__(kwargs, color)
          self.x2 = x2
          self.y2 = y2
          self.thickness = thickness
-         if kwargs: print(f"Warning: Unknown arguments for line: {kwargs}")
 
      def draw(self, x, y):
          arcade.draw_line(x, y, self.x2, self.y2, self.color, self.thickness)

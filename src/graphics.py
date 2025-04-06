@@ -13,30 +13,31 @@ class GameView(arcade.View):
         self.command_queue = command_queue
 
     def process_commands(self):
-        try:
-            command = self.command_queue.get_nowait()
-            cmd_type = command[0]
-            args = command[1:]
+        while True:
+            try:
+                command = self.command_queue.get_nowait()
+                cmd_type = command[0]
+                args = command[1:]
 
-            if cmd_type == "set_background":
-                color, = args
-                self.background_color = color
-            elif cmd_type == "set_window_size":
-                # FIXME: This is broken for now
-                w, h = args
-                self.controller.set_window_size(w, h)
-            elif cmd_type == "bg_color":
-                color, = args
-                self.background_color = color
-            elif cmd_type == "draw":
-                point, shape, = args
-                self.shapes.append((point, shape))
+                if cmd_type == "set_background":
+                    color, = args
+                    self.background_color = color
+                elif cmd_type == "set_window_size":
+                    # FIXME: This is broken for now
+                    w, h = args
+                    self.controller.set_window_size(w, h)
+                elif cmd_type == "bg_color":
+                    color, = args
+                    self.background_color = color
+                elif cmd_type == "draw":
+                    point, shape, = args
+                    self.shapes.append((point, shape))
 
-            self.command_queue.task_done()
-        except queue.Empty:
-            pass
-        except Exception as e:
-            print(f"Error processing graphics commands: {e}")
+                self.command_queue.task_done()
+            except queue.Empty:
+                break
+            except Exception as e:
+                print(f"Error processing graphics commands: {e}")
 
     def on_update(self, delta_time):
         self.process_commands()
@@ -114,6 +115,15 @@ class GraphicsController:
 
     def set_window_width(self, width):
         self.command_queue.put(("set_window_size", width, self.window_size[1]))
+
+    def get_window_width(self):
+        return self.window_size[0]
+
+    def get_window_height(self):
+        return self.window_size[1]
+
+    def get_mouse_pos(self):
+        return Vec2(self.window.mouse.x, self.window.mouse.y)
 
     def set_window_height(self, height):
         self.command_queue.put(("set_window_size", self.window_size[0], height))

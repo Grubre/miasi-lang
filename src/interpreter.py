@@ -2,11 +2,28 @@ import sys
 import codecs
 import traceback
 import random
+import math
 
 class Vec2:
     def __init__(self, x, y):
         self.x = x
         self.y = y
+
+    def length(self):
+        return math.sqrt(self.x**2 + self.y**2)
+
+    def __str__(self):
+        return f"({self.x}, {self.y})"
+
+    def normalized(self):
+        length = self.length()
+        if length == 0:
+            return Vec2(0, 0)
+        return Vec2(self.x / length, self.y / length)
+
+
+def is_num(value):
+    return isinstance(value, (int, float))
 
 from antlr4 import CommonTokenStream, FileStream
 from antlr4.error.ErrorListener import ErrorListener
@@ -673,6 +690,12 @@ def get_random_color():
     b = random.randint(0, 255)
     return r, g, b
 
+def get_sqrt(num):
+    return math.sqrt(num)
+
+def normalize(vec):
+    return vec.normalized()
+
 def setup_builtin_functions(interpreter: CustomInterpreterVisitor, graphics_controller: GraphicsController):
     interpreter.add_builtin_function('print', builtin_print)
     interpreter.add_builtin_function('draw', lambda point, shape: graphics_controller.draw_shape(point, shape))
@@ -680,6 +703,12 @@ def setup_builtin_functions(interpreter: CustomInterpreterVisitor, graphics_cont
     interpreter.add_builtin_function('range', get_range)
     interpreter.add_builtin_function('len', get_len)
     interpreter.add_builtin_function('random_color', get_random_color)
+    interpreter.add_builtin_function('sqrt', get_sqrt)
+    interpreter.add_builtin_function('normalize', normalize)
+    interpreter.add_builtin_function('get_mouse_pos', graphics_controller.get_mouse_pos)
+    interpreter.add_builtin_function('get_window_width', graphics_controller.get_window_width)
+    interpreter.add_builtin_function('get_window_height', graphics_controller.get_window_height)
+    interpreter.add_builtin_function('sin', math.sin)
 
     interpreter.add_property('width', lambda width: graphics_controller.set_window_width(width))
     interpreter.add_property('height', lambda height: graphics_controller.set_window_height(height))

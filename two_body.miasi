@@ -1,0 +1,43 @@
+set bg_color #050510;
+
+let GM = 60000;
+let timeScale = 10.0;
+let epsilon = 1;
+
+let centerX = get_window_width() / 2;
+let centerY = get_window_height() / 2;
+
+let sunPos = (centerX, centerY);
+let sunShape = Circle{ radius: 100, color: rgb(255, 220, 50) };
+
+let orbitRadius = 250;
+let planetPos = (centerX + orbitRadius, centerY);
+let initialSpeed = sqrt(GM / orbitRadius);
+let planetVel = (0, initialSpeed);
+let planetShape = Circle{ radius: 20, color: rgb(100, 150, 255) };
+
+draw(sunPos, sunShape);
+draw(planetPos, planetShape);
+
+on update(dt) {
+    let simDT = dt * timeScale;
+
+    let dx = sunPos.x - planetPos.x;
+    let dy = sunPos.y - planetPos.y;
+
+    let distSq = dx*dx + dy*dy + epsilon;
+    let dist = sqrt(distSq);
+
+    let dirX = dx / dist;
+    let dirY = dy / dist;
+
+    let accelMag = GM / distSq;
+    let accelX = dirX * accelMag;
+    let accelY = dirY * accelMag;
+
+    planetVel.x = planetVel.x + accelX * simDT;
+    planetVel.y = planetVel.y + accelY * simDT;
+
+    planetPos.x = planetPos.x + planetVel.x * simDT;
+    planetPos.y = planetPos.y + planetVel.y * simDT;
+}
