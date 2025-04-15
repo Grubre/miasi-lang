@@ -28,9 +28,9 @@ def is_num(value):
 from antlr4 import CommonTokenStream, FileStream
 from antlr4.error.ErrorListener import ErrorListener
 
-from GrammarLexer import GrammarLexer
-from GrammarParser import GrammarParser
-from GrammarVisitor import GrammarVisitor
+from gen.GrammarLexer import GrammarLexer
+from gen.GrammarParser import GrammarParser
+from gen.GrammarVisitor import GrammarVisitor
 
 from graphics import GraphicsController
 from shape import *
